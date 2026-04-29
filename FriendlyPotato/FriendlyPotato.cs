@@ -25,6 +25,7 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.Graphics;
@@ -595,26 +596,35 @@ public sealed partial class FriendlyPotato : IDalamudPlugin
                 friends++;
             }
 
-            foreach (var status in player.Character.StatusList)
+            int processed = 0;
+            try
             {
-                if (Configuration.DebugStatuses && status.RemainingTime > 0)
+                foreach (var status in player.Character.StatusList)
                 {
-                    PluginLog.Verbose(
-                        $"Player {player.Character.Name} @ {player.Character.HomeWorld} has status {status.StatusId} - remaining: {status.RemainingTime}");
-                }
+                    processed++;
+                    if (Configuration.DebugStatuses && status.RemainingTime > 0)
+                    {
+                        PluginLog.Verbose(
+                            $"Player {player.Character.Name} @ {player.Character.HomeWorld} has status {status.StatusId} - remaining: {status.RemainingTime}");
+                    }
 
-                switch (status.StatusId)
-                {
-                    case 148 or 1140:
-                        player.Raised = true;
-                        raised++;
-                        break;
-                    case 1970:
-                        player.Doomed = true;
-                        player.AddKind(PlayerCharacterKind.Doomed);
-                        doomed++;
-                        break;
+                    switch (status.StatusId)
+                    {
+                        case 148 or 1140:
+                            player.Raised = true;
+                            raised++;
+                            break;
+                        case 1970:
+                            player.Doomed = true;
+                            player.AddKind(PlayerCharacterKind.Doomed);
+                            doomed++;
+                            break;
+                    }
                 }
+            }
+            catch (IndexOutOfRangeException ex)
+            {
+                PluginLog.Error($"Error processing statuses for player {player.Character.Name}: index was out of range. {player.Character.StatusList.Length} statuses reported. {processed} statuses processed before error. Exception: {ex}");
             }
         }
 
@@ -781,28 +791,48 @@ public sealed partial class FriendlyPotato : IDalamudPlugin
 
     private void OnDebugCommand(string command, string args)
     {
-
-        SendChatFlag(new Vector2(LastPlayerPosition.X, LastPlayerPosition.Z), GetInstance(), "Debug flag from /fpotdbg", SeColorWhite);
-
-        Framework.RunOnTick(() =>
+        unsafe
         {
-            unsafe
-            {
-                // var control = Control.Instance();
-                // PluginLog.Debug($"Control address: {(nint)control:X16} ; walking address: {(nint)control + 29976:X16}");
-                // PluginLog.Debug($"control: {control->IsWalking} {Marshal.ReadByte((nint)control + 29976)} {Marshal.ReadByte((nint)control + 30260)} {Marshal.ReadByte((nint)control + 0x76a0)}");
-                //control->IsWalking = true; // doesn't work during auto-run
-                //Marshal.WriteByte((nint)control + 29976, 0x1); // works for both auto-run and manual movement
-                var camera = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.CameraManager.Instance()->CurrentCamera;
-                PluginLog.Debug($"Camera address: {(nint)camera:X16}");
-                var bytes = new List<byte>();
-                for (var i = 0; i < 256 /* size of Camera struct */; i++)
-                {
-                    bytes.Add(Marshal.ReadByte((nint)camera + i));
-                }
-                PluginLog.Debug($"Camera bytes: {BitConverter.ToString(bytes.ToArray())}");
-            }
-        }, TimeSpan.FromSeconds(1));
+            // var player = (GameObject*)ObjectTable.LocalPlayer!.Address;
+            // PluginLog.Debug($"Player object address: {(nint)player:X16}, vtable address {(nint)player->VirtualTable:X16}");
+            // for (var i = 1; i <= 77; i++)
+            // {
+            //     var offset = i * sizeof(nint);
+            //     var funcPtr = Marshal.ReadIntPtr((nint)player->VirtualTable + offset);
+            //     PluginLog.Debug($"VTable[{i}] at offset {offset:X} : {(nint)funcPtr:X16}");
+            // }
+
+            var statuses = (StatusManager*)ObjectTable.LocalPlayer!.StatusList.Address;
+            PluginLog.Debug($"Statuses count: {statuses->NumValidStatuses}");
+        }
+
+        // SendChatFlag(new Vector2(LastPlayerPosition.X, LastPlayerPosition.Z), GetInstance(), "Debug flag from /fpotdbg", SeColorWhite);
+
+        // var env = System.Environment.GetEnvironmentVariables();
+        // foreach (var key in env.Keys)
+        // {
+        //     PluginLog.Debug($"Env {key}: {env[key]}");
+        // }
+
+        // Framework.RunOnTick(() =>
+        // {
+        //     unsafe
+        //     {
+        //         // var control = Control.Instance();
+        //         // PluginLog.Debug($"Control address: {(nint)control:X16} ; walking address: {(nint)control + 29976:X16}");
+        //         // PluginLog.Debug($"control: {control->IsWalking} {Marshal.ReadByte((nint)control + 29976)} {Marshal.ReadByte((nint)control + 30260)} {Marshal.ReadByte((nint)control + 0x76a0)}");
+        //         //control->IsWalking = true; // doesn't work during auto-run
+        //         //Marshal.WriteByte((nint)control + 29976, 0x1); // works for both auto-run and manual movement
+        //         var camera = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.CameraManager.Instance()->CurrentCamera;
+        //         PluginLog.Debug($"Camera address: {(nint)camera:X16}");
+        //         var bytes = new List<byte>();
+        //         for (var i = 0; i < 256 /* size of Camera struct */; i++)
+        //         {
+        //             bytes.Add(Marshal.ReadByte((nint)camera + i));
+        //         }
+        //         PluginLog.Debug($"Camera bytes: {BitConverter.ToString(bytes.ToArray())}");
+        //     }
+        // }, TimeSpan.FromSeconds(1));
         // PluginLog.Debug($"Player's job abbreviation is {ObjectTable.LocalPlayer?.ClassJob.ValueNullable?.Abbreviation.ToString()}");
         // var pos = ObjectTable.LocalPlayer!.Position;
         // var posFlat = new Vector2(pos.X, pos.Z);
