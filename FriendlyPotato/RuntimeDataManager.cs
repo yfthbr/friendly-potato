@@ -90,6 +90,10 @@ public sealed class RuntimeDataManager : IDisposable
 
                 return MessagePackSerializer.Serialize(data);
             }
+            catch (InvalidDataException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 logger.Error($"Error saving data: {ex.Message}");
