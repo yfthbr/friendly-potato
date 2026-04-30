@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [versionize](https://github.com/versionize/versionize) for commit guidelines.
 
+<a name="1.22.9"></a>
+## 1.22.9 (2026-04-30)
+
+### Bug Fixes
+
+* cwls inactive highlights
+* use reliablefilestorage and reduce locking on fw tick
+
 <a name="1.22.8"></a>
 ## 1.22.8 (2026-04-30)
 
