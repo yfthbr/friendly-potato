@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [versionize](https://github.com/versionize/versionize) for commit guidelines.
 
+<a name="1.22.15"></a>
+## 1.22.15 (2026-04-30)
+
+### Bug Fixes
+
+* preload arrow textures
+
 <a name="1.22.14"></a>
 ## 1.22.14 (2026-04-30)
 
