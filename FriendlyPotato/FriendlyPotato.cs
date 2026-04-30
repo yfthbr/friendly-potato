@@ -260,6 +260,11 @@ public sealed partial class FriendlyPotato : IDalamudPlugin
     [PluginService]
     internal static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
 
+    [PluginService]
+#pragma warning disable Dalamud001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+    internal static IReliableFileStorage ReliableFileStorage { get; private set; } = null!;
+#pragma warning restore Dalamud001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+
     public Configuration Configuration { get; init; }
     private ConfigWindow ConfigWindow { get; init; }
     private PlayerListWindow PlayerListWindow { get; init; }

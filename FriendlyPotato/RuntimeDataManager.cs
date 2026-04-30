@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -19,7 +20,7 @@ public sealed class RuntimeDataManager : IDisposable
     private readonly IDalamudPluginInterface pluginInterface;
     private readonly ReaderWriterLockSlim readerWriterLock = new(LockRecursionPolicy.NoRecursion);
     private readonly Timer timer = new();
-    private volatile bool pendingSave;
+    private ConcurrentQueue<(string PlayerName, bool Add, DateTime Timestamp)> pending = new();
 
     public RuntimeDataManager(IDalamudPluginInterface pi, IPluginLog pl)
     {
@@ -32,9 +33,9 @@ public sealed class RuntimeDataManager : IDisposable
         }
         else
         {
-            data = File.Exists(Path.Combine(pi.GetPluginConfigDirectory(), FileName))
+            data = FriendlyPotato.ReliableFileStorage.Exists(Path.Combine(pi.GetPluginConfigDirectory(), FileName))
                        ? MessagePackSerializer.Deserialize<Data>(
-                           File.ReadAllBytes(Path.Combine(pi.GetPluginConfigDirectory(), FileName)))
+                           FriendlyPotato.ReliableFileStorage.ReadAllBytesAsync(Path.Combine(pi.GetPluginConfigDirectory(), FileName)).GetAwaiter().GetResult())
                        : new Data();
         }
 
@@ -50,42 +51,64 @@ public sealed class RuntimeDataManager : IDisposable
         readerWriterLock.Dispose();
     }
 
-    private void SaveCallback(object? _, ElapsedEventArgs __)
+    private async void SaveCallback(object? _, ElapsedEventArgs __)
+    {
+        try
+        {
+            var serializedData = SerializeData();
+            await FriendlyPotato.ReliableFileStorage.WriteAllBytesAsync(
+                Path.Combine(pluginInterface.GetPluginConfigDirectory(), FileName),
+                serializedData);
+            logger.Debug("Saving runtime data complete");
+        }
+        catch (InvalidDataException)
+        {
+            // nothing to do
+        }
+        catch (Exception ex)
+        {
+            logger.Error($"Error writing data to file: {ex.Message}");
+        }
+    }
+
+    private byte[] SerializeData()
     {
         if (readerWriterLock.TryEnterWriteLock(TimeSpan.FromMilliseconds(10)))
         {
             try
             {
-                if (!pendingSave) return;
-                logger.Information("Saving runtime data");
-                File.WriteAllBytes(Path.Combine(pluginInterface.GetPluginConfigDirectory(), FileName),
-                                   MessagePackSerializer.Serialize(data));
-                pendingSave = false;
+                if (pending.IsEmpty) throw new InvalidDataException("No pending data to save.");
+                logger.Debug("Saving runtime data");
+
+                while (pending.TryDequeue(out var item))
+                {
+                    if (item.Add || data.Seen.ContainsKey(item.PlayerName))
+                    {
+                        data.Seen[item.PlayerName] = item.Timestamp;
+                    }
+                }
+
+                return MessagePackSerializer.Serialize(data);
             }
             catch (Exception ex)
             {
                 logger.Error($"Error saving data: {ex.Message}");
-            } finally
+                throw;
+            }
+            finally
             {
                 readerWriterLock.ExitWriteLock();
             }
+        }
+        else
+        {
+            throw new TimeoutException("Could not acquire write lock to save data.");
         }
     }
 
     public void MarkSeen(string playerName, bool add = true)
     {
-        if (readerWriterLock.TryEnterWriteLock(TimeSpan.FromMilliseconds(10)))
-        {
-            try
-            {
-                if (!add && !data.Seen.ContainsKey(playerName)) return;
-                data.Seen[playerName] = DateTime.Now;
-                pendingSave = true;
-            } finally
-            {
-                readerWriterLock.ExitWriteLock();
-            }
-        }
+        pending.Enqueue((playerName, add, DateTime.Now));
     }
 
     public DateTime? LastSeen(string playerName)
@@ -95,7 +118,8 @@ public sealed class RuntimeDataManager : IDisposable
             try
             {
                 return data.Seen.TryGetValue(playerName, out var value) ? value : null;
-            } finally
+            }
+            finally
             {
                 readerWriterLock.ExitReadLock();
             }
