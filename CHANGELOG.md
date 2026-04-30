@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [versionize](https://github.com/versionize/versionize) for commit guidelines.
 
+<a name="1.22.14"></a>
+## 1.22.14 (2026-04-30)
+
+### Bug Fixes
+
+* properly dispose runtimedatamanager
+
 <a name="1.22.13"></a>
 ## 1.22.13 (2026-04-30)
 
