@@ -18,7 +18,7 @@ cat << EOF > repository.json
     "Author": "YF",
     "Name": "Friendly Potato",
     "InternalName": "FriendlyPotato",
-    "AssemblyVersion": "$VERSION",
+    "AssemblyVersion": "$VERSION.0",
     "Description": "An informational plugin.",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/Sidiousious/friendly-potato",

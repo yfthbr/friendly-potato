@@ -55,15 +55,12 @@ public sealed class RuntimeDataManager : IDisposable
     {
         try
         {
-            var serializedData = SerializeData();
+            var (serializedData, hasData) = SerializeData();
+            if (!hasData) return;
             await FriendlyPotato.ReliableFileStorage.WriteAllBytesAsync(
                 Path.Combine(pluginInterface.GetPluginConfigDirectory(), FileName),
                 serializedData);
             logger.Debug("Saving runtime data complete");
-        }
-        catch (InvalidDataException)
-        {
-            // nothing to do
         }
         catch (Exception ex)
         {
@@ -71,13 +68,13 @@ public sealed class RuntimeDataManager : IDisposable
         }
     }
 
-    private byte[] SerializeData()
+    private (byte[] Data, bool HasData) SerializeData()
     {
         if (readerWriterLock.TryEnterWriteLock(TimeSpan.FromMilliseconds(10)))
         {
             try
             {
-                if (pending.IsEmpty) throw new InvalidDataException("No pending data to save.");
+                if (pending.IsEmpty) return ([], false);
                 logger.Debug("Saving runtime data");
 
                 while (pending.TryDequeue(out var item))
@@ -88,11 +85,7 @@ public sealed class RuntimeDataManager : IDisposable
                     }
                 }
 
-                return MessagePackSerializer.Serialize(data);
-            }
-            catch (InvalidDataException)
-            {
-                throw;
+                return (MessagePackSerializer.Serialize(data), true);
             }
             catch (Exception ex)
             {
