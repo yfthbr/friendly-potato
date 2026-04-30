@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [versionize](https://github.com/versionize/versionize) for commit guidelines.
 
+<a name="1.22.11"></a>
+## 1.22.11 (2026-04-30)
+
+### Bug Fixes
+
+* don't log error when no data
+
 <a name="1.22.10"></a>
 ## 1.22.10 (2026-04-30)
 
