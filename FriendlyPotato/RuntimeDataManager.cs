@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Timers;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -20,6 +21,7 @@ public sealed class RuntimeDataManager : IDisposable
     private readonly IDalamudPluginInterface pluginInterface;
     private readonly ReaderWriterLockSlim readerWriterLock = new(LockRecursionPolicy.NoRecursion);
     private volatile bool isDisposed = false;
+    private CancellationTokenSource cts = new();
     private ConcurrentQueue<(string PlayerName, bool Add, DateTime Timestamp)> pending = new();
 
     public RuntimeDataManager(IDalamudPluginInterface pi, IPluginLog pl)
@@ -44,19 +46,25 @@ public sealed class RuntimeDataManager : IDisposable
 
     public void Dispose()
     {
+        logger.Info($"RuntimeDataManager Dispose() => isDisposed={isDisposed}");
         if (isDisposed) return;
         isDisposed = true;
         readerWriterLock.Dispose();
+        cts.Cancel();
+        cts.Dispose();
+        logger.Info("RuntimeDataManager disposed");
     }
 
     private async void RunSerializer()
     {
+        logger.Info("Starting RunSerializer");
         while (!isDisposed)
         {
             try
             {
                 var (serializedData, hasData) = SerializeData();
-                if (!hasData) return;
+                logger.Debug($"Serialized data, hasData={hasData}");
+                if (!hasData) goto end;
                 await FriendlyPotato.ReliableFileStorage.WriteAllBytesAsync(
                     Path.Combine(pluginInterface.GetPluginConfigDirectory(), FileName),
                     serializedData);
@@ -67,8 +75,18 @@ public sealed class RuntimeDataManager : IDisposable
                 logger.Error($"Error writing data to file: {ex.Message}");
             }
 
-            await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(60));
+        end:
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(60), cts.Token);
+            }
+            catch (TaskCanceledException)
+            {
+                logger.Info("RunSerializer delay cancelled");
+                break;
+            }
         }
+        logger.Info("Stopped RunSerializer");
     }
 
     private (byte[] Data, bool HasData) SerializeData()

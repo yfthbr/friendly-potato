@@ -196,6 +196,7 @@ public sealed partial class FriendlyPotato : IDalamudPlugin
         PlayerListWindow.Dispose();
         LocatorWindow.Dispose();
         commandPanel.Dispose();
+        RuntimeData.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
         CommandManager.RemoveHandler(DebugCommandName);
