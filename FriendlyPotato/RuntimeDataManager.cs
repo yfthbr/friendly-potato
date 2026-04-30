@@ -19,7 +19,7 @@ public sealed class RuntimeDataManager : IDisposable
     private readonly IPluginLog logger;
     private readonly IDalamudPluginInterface pluginInterface;
     private readonly ReaderWriterLockSlim readerWriterLock = new(LockRecursionPolicy.NoRecursion);
-    private readonly Timer timer = new();
+    private volatile bool isDisposed = false;
     private ConcurrentQueue<(string PlayerName, bool Add, DateTime Timestamp)> pending = new();
 
     public RuntimeDataManager(IDalamudPluginInterface pi, IPluginLog pl)
@@ -39,32 +39,35 @@ public sealed class RuntimeDataManager : IDisposable
                        : new Data();
         }
 
-        timer.Elapsed += SaveCallback;
-        timer.AutoReset = true;
-        timer.Interval = 60_000;
-        timer.Start();
+        RunSerializer();
     }
 
     public void Dispose()
     {
-        timer.Dispose();
+        if (isDisposed) return;
+        isDisposed = true;
         readerWriterLock.Dispose();
     }
 
-    private async void SaveCallback(object? _, ElapsedEventArgs __)
+    private async void RunSerializer()
     {
-        try
+        while (!isDisposed)
         {
-            var (serializedData, hasData) = SerializeData();
-            if (!hasData) return;
-            await FriendlyPotato.ReliableFileStorage.WriteAllBytesAsync(
-                Path.Combine(pluginInterface.GetPluginConfigDirectory(), FileName),
-                serializedData);
-            logger.Debug("Saving runtime data complete");
-        }
-        catch (Exception ex)
-        {
-            logger.Error($"Error writing data to file: {ex.Message}");
+            try
+            {
+                var (serializedData, hasData) = SerializeData();
+                if (!hasData) return;
+                await FriendlyPotato.ReliableFileStorage.WriteAllBytesAsync(
+                    Path.Combine(pluginInterface.GetPluginConfigDirectory(), FileName),
+                    serializedData);
+                logger.Debug("Saving runtime data complete");
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Error writing data to file: {ex.Message}");
+            }
+
+            await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(60));
         }
     }
 
@@ -77,7 +80,7 @@ public sealed class RuntimeDataManager : IDisposable
                 if (pending.IsEmpty) return ([], false);
                 logger.Debug("Saving runtime data");
 
-                while (pending.TryDequeue(out var item))
+                while (pending.TryDequeue(out var item) && !isDisposed)
                 {
                     if (item.Add || data.Seen.ContainsKey(item.PlayerName))
                     {
@@ -94,7 +97,8 @@ public sealed class RuntimeDataManager : IDisposable
             }
             finally
             {
-                readerWriterLock.ExitWriteLock();
+                if (!isDisposed)
+                    readerWriterLock.ExitWriteLock();
             }
         }
         else
