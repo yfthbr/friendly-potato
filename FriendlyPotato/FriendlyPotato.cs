@@ -1007,7 +1007,7 @@ public sealed partial class FriendlyPotato : IDalamudPlugin
 
         // TODO: use more managed/safe properties
         var lsAddon = (AtkUnitBase*)lsAddonPtr.Address;
-        var componentList = lsAddon->GetComponentListById(33);
+        var componentList = lsAddon->GetComponentListById(36);
         if (componentList == null) return;
 
         foreach (nint i in Enumerable.Range(0, componentList->ListLength))
