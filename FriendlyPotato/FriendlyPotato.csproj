@@ -3,7 +3,6 @@
     <PropertyGroup>
         <Version>1.22.8</Version>
         <Description>An informational plugin.</Description>
-        <PackageProjectUrl>https://github.com/sidiousious/friendly-potato</PackageProjectUrl>
         <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     </PropertyGroup>
 
