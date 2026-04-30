@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Textures;
 using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
@@ -20,6 +21,8 @@ public sealed class LocatorWindow : Window, IDisposable
     private readonly Dictionary<uint, HealthTrack> healths = new();
     private readonly Vector4 red = new(0.7f, 0f, 0f, 1f);
     private readonly Vector4 yellow = new(0.7f, 0.7f, 0f, 1f);
+    private readonly Dictionary<ObjectLocation.Variant, ISharedImmediateTexture> arrowTextures = new();
+    private readonly ISharedImmediateTexture defaultArrowTexture = FriendlyPotato.TextureProvider.GetFromFile(FriendlyPotato.AssetPath("_bluearrow.png"));
 
     // We give this window a constant ID using ###
     // This allows for labels being dynamic, like "{FPS Counter}fps###XYZ counter window",
@@ -31,6 +34,10 @@ public sealed class LocatorWindow : Window, IDisposable
         SizeCondition = ImGuiCond.Always;
         PositionCondition = ImGuiCond.Always;
         configuration = plugin.Configuration;
+
+        arrowTextures[ObjectLocation.Variant.SRank] = FriendlyPotato.TextureProvider.GetFromFile(FriendlyPotato.AssetPath("_arrow.png"));
+        arrowTextures[ObjectLocation.Variant.ARank] = FriendlyPotato.TextureProvider.GetFromFile(FriendlyPotato.AssetPath("_purplearrow.png"));
+        arrowTextures[ObjectLocation.Variant.Fate] = FriendlyPotato.TextureProvider.GetFromFile(FriendlyPotato.AssetPath("_greenarrow.png"));
     }
 
     public void Dispose() { }
@@ -90,20 +97,15 @@ public sealed class LocatorWindow : Window, IDisposable
 
             if (obj.Distance < 0f) return;
 
-            var arrowImagePath = obj.Type switch
+            if (!arrowTextures.TryGetValue(obj.Type, out var sharedTexture))
             {
-                ObjectLocation.Variant.SRank => FriendlyPotato.AssetPath("_arrow.png"),
-                ObjectLocation.Variant.ARank => FriendlyPotato.AssetPath("_purplearrow.png"),
-                ObjectLocation.Variant.Fate => FriendlyPotato.AssetPath("_greenarrow.png"),
-                _ => FriendlyPotato.AssetPath("_bluearrow.png")
-            };
+                sharedTexture = defaultArrowTexture;
+            }
 
-            var texture = FriendlyPotato.TextureProvider
-                                        .GetFromFile(arrowImagePath)
-                                        .GetWrapOrDefault();
+            var texture = sharedTexture.GetWrapOrDefault();
             if (texture == null)
             {
-                FriendlyPotato.PluginLog.Warning("Could not find texture `{0}`", arrowImagePath);
+                FriendlyPotato.PluginLog.Warning("Could not find texture for type `{0}`", obj.Type);
                 return;
             }
 
